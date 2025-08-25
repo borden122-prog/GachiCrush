@@ -1,0 +1,120 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+    padding: 40px 10px;
+    box-sizing: border-box;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #333333;
+    position: relative;
+}
+/* Отключение анимаций при первом рендере */
+body.no-anim canvas#gameCanvas { transition: none; }
+body.no-anim #score-container { transition: none; }
+body.no-anim body.start-screen canvas#gameCanvas { opacity: 0; transform: scale(0.7); }
+
+#score-container {
+    background-color: white;
+    padding: 30px;
+    border-radius: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 100px;
+    width: 260px; /* фиксированная ширина для стабильного layout */
+    flex: 0 0 260px;
+    z-index: 2;
+    transition: left 600ms cubic-bezier(0,0,0.2,1), top 600ms cubic-bezier(0,0,0.2,1), transform 600ms cubic-bezier(0,0,0.2,1), margin-right 600ms cubic-bezier(0,0,0.2,1);
+}
+
+#score-container h1 {
+    font-size: 32px;
+    margin: 0 0 10px 0;
+    font-family: 'Nunito', Arial, Helvetica, sans-serif;
+    font-weight: 700;
+}
+
+#score {
+    font-size: 100px;
+    font-weight: 800;
+    margin: 0;
+    font-family: 'Nunito', Arial, Helvetica, sans-serif;
+    font-variant-numeric: tabular-nums; /* фиксированная ширина цифр */
+    line-height: 1;
+}
+
+#timer {
+    margin-top: 24px;
+    font-size: 32px;
+    font-family: 'Nunito', Arial, Helvetica, sans-serif;
+    font-weight: 700;
+}
+
+#restartBtn {
+    margin-top: 24px;
+    padding: 12px 18px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    background: #333333;
+    color: #ffffff;
+    cursor: pointer;
+    width: 100%;
+}
+
+#playBtn {
+    margin-top: 16px;
+    padding: 12px 18px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 10px;
+    background: #333333;
+    color: #ffffff;
+    cursor: pointer;
+    width: 100%;
+}
+
+/* Состояние стартового экрана */
+body.start-screen #score-container {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    margin-right: 0;
+}
+body.start-screen #score-container h1 { margin-bottom: 8px; }
+body.start-screen #score { display: none; }
+body.start-screen #timer { display: none; }
+body.start-screen #playBtn { display: block; }
+body.start-screen #restartBtn { display: none; }
+
+/* Анимации состояний */
+canvas#gameCanvas {
+    transition: opacity 400ms cubic-bezier(0,0,0.2,1), transform 400ms cubic-bezier(0,0,0.2,1);
+    transform-origin: center center;
+    z-index: 1;
+}
+
+body.start-screen canvas#gameCanvas {
+    opacity: 0;
+    transform: scale(0.7);
+    pointer-events: none;
+}
+
+body.game-over canvas#gameCanvas {
+    opacity: 0;
+    transform: scale(0.7);
+}
+
+body.game-over #score-container {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    margin-right: 0;
+}
