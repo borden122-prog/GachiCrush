@@ -1,3 +1,78 @@
+// === Фоновые плитки на стартовом экране ===
+const bgTilesContainer = document.getElementById('bg-tiles');
+const bgTileImages = [
+    'assets/tile1.png',
+    'assets/tile2.png',
+    'assets/tile3.png',
+    'assets/tile4.png',
+    'assets/tile5.png',
+    'assets/tile6.png'
+];
+const bgTiles = [];
+const BG_TILE_COUNT = 16;
+let parallax = {x: 0, y: 0};
+
+function createBgTiles() {
+    if (!bgTilesContainer) return;
+    bgTilesContainer.innerHTML = '';
+    bgTiles.length = 0;
+    for (let i = 0; i < BG_TILE_COUNT; i++) {
+        const img = document.createElement('img');
+        img.src = bgTileImages[Math.floor(Math.random() * bgTileImages.length)];
+        // Случайные стартовые позиции и параметры движения
+        const angle = Math.random() * 2 * Math.PI;
+        const speed = 0.2 + Math.random() * 0.3;
+        const radius = 40 + Math.random() * 60;
+        const baseX = Math.random() * window.innerWidth;
+        const baseY = Math.random() * window.innerHeight;
+        const size = 38 + Math.random() * 38;
+        img.style.width = img.style.height = size + 'px';
+        img.style.opacity = 0.5 + Math.random() * 0.4;
+        bgTilesContainer.appendChild(img);
+        bgTiles.push({img, angle, speed, radius, baseX, baseY, size});
+    }
+}
+
+function animateBgTiles() {
+    const t = performance.now() / 1000;
+    for (const tile of bgTiles) {
+        // Круговое движение + parallax
+        const x = tile.baseX + Math.cos(tile.angle + t * tile.speed) * tile.radius + parallax.x * 0.18 * (tile.size/60);
+        const y = tile.baseY + Math.sin(tile.angle + t * tile.speed) * tile.radius + parallax.y * 0.18 * (tile.size/60);
+        tile.img.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    requestAnimationFrame(animateBgTiles);
+}
+
+function updateParallax(e) {
+    // e может быть MouseEvent или TouchEvent
+    let x = 0, y = 0;
+    if (e.touches && e.touches.length) {
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+    } else {
+        x = e.clientX;
+        y = e.clientY;
+    }
+    parallax.x = (x - window.innerWidth/2) / (window.innerWidth/2);
+    parallax.y = (y - window.innerHeight/2) / (window.innerHeight/2);
+}
+
+function enableBgTiles() {
+    if (!bgTilesContainer) return;
+    bgTilesContainer.style.display = 'block';
+    createBgTiles();
+    animateBgTiles();
+    window.addEventListener('mousemove', updateParallax);
+    window.addEventListener('touchmove', updateParallax, {passive:true});
+}
+function disableBgTiles() {
+    if (!bgTilesContainer) return;
+    bgTilesContainer.style.display = 'none';
+    bgTilesContainer.innerHTML = '';
+    window.removeEventListener('mousemove', updateParallax);
+    window.removeEventListener('touchmove', updateParallax);
+}
 class Tile {
     constructor(id, image) {
         this.id = id;
@@ -75,7 +150,11 @@ function escapeHtml(str) {
 async function showLeaderboard(show = true) {
     if (!leaderboardEl) return;
     leaderboardEl.classList.toggle('visible', show);
-    await renderLeaderboard();
+    const loadingEl = document.getElementById('leaderboard-loading');
+    if (loadingEl) loadingEl.style.display = show ? 'block' : 'none';
+    if (show) {
+        await renderLeaderboard();
+    }
 }
 
 function showPublishForm(score) {
@@ -123,32 +202,32 @@ async function startTimer() {
     const titleEl = document.querySelector('#score-container h1');
     if (titleEl) titleEl.textContent = 'Ваши очки';
     if (timerDisplay) timerDisplay.style.display = 'block';
-    await showLeaderboard(true);
-    hidePublishForm();
-    timerInterval = setInterval(async () => {
-        if (timeLeft > 0) {
-            timeLeft--;
-            updateTimerDisplay();
-        }
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            gameOver = true;
-            const titleEl = document.querySelector('#score-container h1');
-            if (titleEl) titleEl.textContent = 'Ты набрал';
-            if (timerDisplay) timerDisplay.style.display = 'none';
-            if (restartBtn) restartBtn.style.display = 'block';
-            fadeAllTiles(0, 200);
-            document.body.classList.add('game-over');
-            // Показываем таблицу лидеров и форму публикации
-            await showLeaderboard(true);
-            // Проверяем, достоин ли результат публикации
-            const lb = await getLeaderboard();
-            if (score > 0 && (lb.length < LEADERBOARD_SIZE || score > lb[lb.length-1].score)) {
-                showPublishForm(score);
+        if (leaderboardEl) leaderboardEl.classList.remove('visible');
+        hidePublishForm();
+        timerInterval = setInterval(async () => {
+            if (timeLeft > 0) {
+                timeLeft--;
+                updateTimerDisplay();
             }
-        }
-    }, 1000);
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                gameOver = true;
+                const titleEl = document.querySelector('#score-container h1');
+                if (titleEl) titleEl.textContent = 'Ты набрал';
+                if (timerDisplay) timerDisplay.style.display = 'none';
+                if (restartBtn) restartBtn.style.display = 'block';
+                fadeAllTiles(0, 200);
+                document.body.classList.add('game-over');
+                // Показываем таблицу лидеров и форму публикации только после завершения игры
+                await showLeaderboard(true);
+                // Проверяем, достоин ли результат публикации
+                const lb = await getLeaderboard();
+                if (score > 0 && (lb.length < LEADERBOARD_SIZE || score > lb[lb.length-1].score)) {
+                    showPublishForm(score);
+                }
+            }
+        }, 1000);
 }
 
 async function restartGame() {
@@ -164,7 +243,7 @@ async function restartGame() {
     fadeAllTiles(1, 200);
     await startTimer();
     document.body.classList.remove('game-over');
-    await showLeaderboard(true);
+    if (leaderboardEl) leaderboardEl.classList.remove('visible');
     hidePublishForm();
 }
 
@@ -575,6 +654,7 @@ async function startGame() {
     window.addEventListener('resize', resizeCanvas);
     if (restartBtn) restartBtn.addEventListener('click', restartGame);
     if (playBtn) playBtn.addEventListener('click', async () => {
+        disableBgTiles();
         const titleEl = document.querySelector('#score-container h1');
         if (titleEl) titleEl.textContent = 'Ваши очки';
         if (timerDisplay) timerDisplay.style.display = 'block';
@@ -582,7 +662,7 @@ async function startGame() {
         if (playBtn) playBtn.style.display = 'none';
         document.body.classList.remove('start-screen');
         document.body.classList.remove('game-over');
-        await showLeaderboard(true);
+        if (leaderboardEl) leaderboardEl.classList.remove('visible');
         hidePublishForm();
         await startTimer();
     });
@@ -607,6 +687,9 @@ async function startGame() {
     hidePublishForm();
     requestAnimationFrame(() => {
         document.body.classList.remove('no-anim');
+        if (document.body.classList.contains('start-screen')) {
+            enableBgTiles();
+        }
     });
 }
 
