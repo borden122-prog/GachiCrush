@@ -405,7 +405,93 @@ function resizeCanvas() {
 }
 
 // Обработка клика
+
+// --- Drag/Swipe support ---
+let dragStart = null;
+let dragMoved = false;
+
 canvas.addEventListener('click', event => asyncHandleClick(event));
+
+canvas.addEventListener('touchstart', e => {
+    if (isBusy || gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const col = Math.floor(x / tileSize);
+    const row = Math.floor(y / tileSize);
+    dragStart = { row, col };
+    dragMoved = false;
+}, {passive:true});
+
+canvas.addEventListener('touchmove', e => {
+    dragMoved = true;
+}, {passive:true});
+
+canvas.addEventListener('touchend', async e => {
+    if (isBusy || gameOver || !dragStart) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+    if (!touch) { dragStart = null; return; }
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const col = Math.floor(x / tileSize);
+    const row = Math.floor(y / tileSize);
+    if ((row !== dragStart.row || col !== dragStart.col) && isAdjacent(dragStart, {row, col})) {
+        isBusy = true;
+        await animateSwap(dragStart.row, dragStart.col, row, col, true);
+        swapTiles(dragStart.row, dragStart.col, row, col);
+        if (findMatches().size === 0) {
+            await animateSwap(dragStart.row, dragStart.col, row, col, false);
+            swapTiles(dragStart.row, dragStart.col, row, col);
+        } else {
+            await resolveBoard();
+        }
+        drawBoard();
+        isBusy = false;
+    }
+    dragStart = null;
+});
+
+// (Optional) Mouse drag for desktop
+let mouseDown = false;
+canvas.addEventListener('mousedown', e => {
+    if (isBusy || gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const col = Math.floor(x / tileSize);
+    const row = Math.floor(y / tileSize);
+    dragStart = { row, col };
+    mouseDown = true;
+});
+canvas.addEventListener('mousemove', e => {
+    // just to mark drag
+    if (mouseDown) dragMoved = true;
+});
+canvas.addEventListener('mouseup', async e => {
+    if (!mouseDown || isBusy || gameOver || !dragStart) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const col = Math.floor(x / tileSize);
+    const row = Math.floor(y / tileSize);
+    if ((row !== dragStart.row || col !== dragStart.col) && isAdjacent(dragStart, {row, col})) {
+        isBusy = true;
+        await animateSwap(dragStart.row, dragStart.col, row, col, true);
+        swapTiles(dragStart.row, dragStart.col, row, col);
+        if (findMatches().size === 0) {
+            await animateSwap(dragStart.row, dragStart.col, row, col, false);
+            swapTiles(dragStart.row, dragStart.col, row, col);
+        } else {
+            await resolveBoard();
+        }
+        drawBoard();
+        isBusy = false;
+    }
+    dragStart = null;
+    mouseDown = false;
+});
 
 async function asyncHandleClick(event) {
     if (isBusy || gameOver) return;
