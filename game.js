@@ -9,10 +9,88 @@ class Tile {
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
 const scoreDisplay = document.getElementById('score');
 const timerDisplay = document.getElementById('timer');
 const restartBtn = document.getElementById('restartBtn');
 const playBtn = document.getElementById('playBtn');
+const leaderboardEl = document.getElementById('leaderboard');
+const leaderboardList = document.getElementById('leaderboard-list');
+const publishForm = document.getElementById('publish-result');
+const nicknameInput = document.getElementById('nickname');
+const cancelBtn = publishForm ? publishForm.querySelector('.cancel-btn') : null;
+
+
+const LEADERBOARD_API = 'https://gachicrushserver.onrender.com/leaderboard';
+const LEADERBOARD_SIZE = 10;
+
+async function getLeaderboard() {
+    try {
+        const res = await fetch(LEADERBOARD_API);
+        if (!res.ok) throw new Error('Ошибка сервера');
+        return await res.json();
+    } catch {
+        return [];
+    }
+}
+
+async function addToLeaderboard(name, score) {
+    try {
+        const res = await fetch(LEADERBOARD_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, score })
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+async function renderLeaderboard() {
+    const loadingEl = document.getElementById('leaderboard-loading');
+    if (loadingEl) loadingEl.style.display = 'block';
+    leaderboardList.innerHTML = '';
+    let lb = [];
+    try {
+        lb = await getLeaderboard();
+    } finally {
+        if (loadingEl) loadingEl.style.display = 'none';
+    }
+    if (!lb || lb.length === 0) {
+        leaderboardList.innerHTML = '<li class="empty">Пока нет результатов</li>';
+        return;
+    }
+    lb.forEach((entry, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${i+1}. ${escapeHtml(entry.name)}</span><span>${entry.score}</span>`;
+        leaderboardList.appendChild(li);
+    });
+}
+
+function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function showLeaderboard(show = true) {
+    if (!leaderboardEl) return;
+    leaderboardEl.classList.toggle('visible', show);
+    await renderLeaderboard();
+}
+
+function showPublishForm(score) {
+    if (!publishForm) return;
+    publishForm.style.display = 'flex';
+    nicknameInput.value = '';
+    nicknameInput.focus();
+    publishForm.dataset.score = score;
+}
+
+function hidePublishForm() {
+    if (!publishForm) return;
+    publishForm.style.display = 'none';
+    publishForm.dataset.score = '';
+}
 
 // Параметры игры
 const gridSize = 8;
@@ -35,7 +113,7 @@ function updateTimerDisplay() {
     if (timerDisplay) timerDisplay.textContent = formatTime(timeLeft);
 }
 
-function startTimer() {
+async function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
     timeLeft = 60;
     gameOver = false;
@@ -45,7 +123,9 @@ function startTimer() {
     const titleEl = document.querySelector('#score-container h1');
     if (titleEl) titleEl.textContent = 'Ваши очки';
     if (timerDisplay) timerDisplay.style.display = 'block';
-    timerInterval = setInterval(() => {
+    await showLeaderboard(true);
+    hidePublishForm();
+    timerInterval = setInterval(async () => {
         if (timeLeft > 0) {
             timeLeft--;
             updateTimerDisplay();
@@ -58,15 +138,20 @@ function startTimer() {
             if (titleEl) titleEl.textContent = 'Ты набрал';
             if (timerDisplay) timerDisplay.style.display = 'none';
             if (restartBtn) restartBtn.style.display = 'block';
-            // Плавно скрываем изображения на плитках
             fadeAllTiles(0, 200);
-            // Включаем CSS-состояние завершения игры
             document.body.classList.add('game-over');
+            // Показываем таблицу лидеров и форму публикации
+            await showLeaderboard(true);
+            // Проверяем, достоин ли результат публикации
+            const lb = await getLeaderboard();
+            if (score > 0 && (lb.length < LEADERBOARD_SIZE || score > lb[lb.length-1].score)) {
+                showPublishForm(score);
+            }
         }
     }, 1000);
 }
 
-function restartGame() {
+async function restartGame() {
     if (timerInterval) clearInterval(timerInterval);
     score = 0;
     scoreDisplay.textContent = score;
@@ -74,13 +159,13 @@ function restartGame() {
     isBusy = false;
     gameOver = false;
     initBoard();
-    // Сначала делаем изображения невидимыми, затем плавно показываем
     board.forEach(row => row.forEach(tile => { if (tile) tile.alpha = 0; }));
     drawBoard();
     fadeAllTiles(1, 200);
-    startTimer();
-    // Выключаем CSS-состояние завершения игры (панель возвращается влево, канвас появляется)
+    await startTimer();
     document.body.classList.remove('game-over');
+    await showLeaderboard(true);
+    hidePublishForm();
 }
 
 // Загрузка PNG-изображений
@@ -484,13 +569,12 @@ function findMatches() {
 
 // Запуск игры
 async function startGame() {
-    await preprocessImages(); // загружаем без ресайза
+    await preprocessImages();
     await initBoard();
     await resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     if (restartBtn) restartBtn.addEventListener('click', restartGame);
-    if (playBtn) playBtn.addEventListener('click', () => {
-        // Перелёт блока из центра влево (содержимое меняем сразу, блок один и тот же)
+    if (playBtn) playBtn.addEventListener('click', async () => {
         const titleEl = document.querySelector('#score-container h1');
         if (titleEl) titleEl.textContent = 'Ваши очки';
         if (timerDisplay) timerDisplay.style.display = 'block';
@@ -498,9 +582,29 @@ async function startGame() {
         if (playBtn) playBtn.style.display = 'none';
         document.body.classList.remove('start-screen');
         document.body.classList.remove('game-over');
-        startTimer();
+        await showLeaderboard(true);
+        hidePublishForm();
+        await startTimer();
     });
-    // Классы start-screen и no-anim уже проставлены в HTML
+    // Форма публикации результата
+    if (publishForm) {
+        publishForm.addEventListener('submit', async e => {
+            e.preventDefault();
+            const name = nicknameInput.value.trim().slice(0, 16) || 'Игрок';
+            const score = parseInt(publishForm.dataset.score, 10) || 0;
+            await addToLeaderboard(name, score);
+            await renderLeaderboard();
+            hidePublishForm();
+        });
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', e => {
+                e.preventDefault();
+                hidePublishForm();
+            });
+        }
+    }
+    await showLeaderboard(true);
+    hidePublishForm();
     requestAnimationFrame(() => {
         document.body.classList.remove('no-anim');
     });

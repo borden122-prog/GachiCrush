@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="leaderboard.css">
 </head>
 <body class="start-screen no-anim">
     <div id="score-container">
@@ -16,6 +17,16 @@
         <div id="timer">01:00</div>
         <button id="playBtn">Играть</button>
         <button id="restartBtn">Заново</button>
+        <div id="leaderboard" class="">
+            <h2>Таблица лидеров</h2>
+            <div id="leaderboard-loading" style="display:none;">Загружаем</div>
+            <ul id="leaderboard-list"></ul>
+            <form id="publish-result" style="display:none;">
+                <input type="text" id="nickname" maxlength="16" placeholder="Ваш ник" autocomplete="off" required />
+                <button type="submit">Опубликовать результат</button>
+                <button type="button" class="cancel-btn">Не публиковать</button>
+            </form>
+        </div>
     </div>
     <canvas id="gameCanvas"></canvas>
     <script src="game.js"></script>
